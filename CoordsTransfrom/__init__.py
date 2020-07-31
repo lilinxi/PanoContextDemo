@@ -47,6 +47,23 @@ def uv2xyz(u, v):
     return x, z, y
 
 
+def sphere2cube(x, y, z):
+    xyzs = []
+    if x > 0.5:
+        xyzs.append([1, y, z])
+    else:
+        xyzs.append([-1, y, z])
+    if y > 0.5:
+        xyzs.append([x, 1, z])
+    else:
+        xyzs.append([x, -1, z])
+    if z > 0.5:
+        xyzs.append([x, y, 1])
+    else:
+        xyzs.append([x, y, -1])
+    return xyzs
+
+
 ########## test ##########
 
 N = 1000
