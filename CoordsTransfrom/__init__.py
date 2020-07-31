@@ -1,5 +1,5 @@
 """
-xyz:          单位球面, 右手坐标系, z 轴向上
+xyz:          [-1,1], [-1,1], [-1,1], 单位球面, 右手坐标系, z 轴向上
 u, v:         [0,1], [0,1], u 向下, v 向右
 phi, theta:   [0,pi], [0,2pi], phi 与 z 轴夹角, theta 与 x 轴夹角
 """
@@ -47,7 +47,7 @@ def uv2xyz(u, v):
     return x, z, y
 
 
-def sphere2cube(x, y, z):
+def sphere2fakecube(x, y, z):
     xyzs = []
     if x > 0.5:
         xyzs.append([1, y, z])
@@ -62,6 +62,12 @@ def sphere2cube(x, y, z):
     else:
         xyzs.append([x, y, -1])
     return xyzs
+
+
+def sphere2cube(x, y, z):
+    maxValue = max(abs(x), abs(y), abs(z))
+    scale = 1 / maxValue
+    return [[x * scale, y * scale, z * scale]]
 
 
 ########## test ##########
