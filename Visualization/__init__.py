@@ -5,7 +5,7 @@ import cv2
 def __drawPanoLineTest(panoImage, lines, mapping, bgr, sampleRate=1.1):
     x, y = mapping(100, 100)
     print(x, y)
-    cv2.circle(panoImage, (round(x), round(y)), 300, (0, 0, 0), -1)
+    cv2.circle(panoImage, (x, y), 300, (0, 0, 0), -1)
 
 
 def DrawPanoLine(panoImage, lines, mapping, bgr, sampleRate=1.1):
@@ -25,6 +25,4 @@ def DrawPanoLine(panoImage, lines, mapping, bgr, sampleRate=1.1):
             x = x0 + dt * dx
             y = y0 + dt * dy
             mx, my = mapping(x, y)
-            mx = round(mx)
-            my = round(my)
             cv2.circle(panoImage, (mx, my), 1, bgr, -1)
