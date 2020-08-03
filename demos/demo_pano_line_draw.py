@@ -5,27 +5,19 @@ import Projection
 import Visualization
 
 panoImage = cv2.imread("../images/360_1.jpg", cv2.IMREAD_COLOR)
-print(type(panoImage))
-print(panoImage.shape)
+edges = np.full(panoImage.shape, 255, dtype=np.uint8)
 
-projectImage, mapping = Projection.__cubeProjectionX1(panoImage, 500)
-print(type(projectImage))
-print(projectImage.shape)
+projectImageAndMapping = Projection.CubeProjection(panoImage, 500)
 
-cv2.imwrite("output_cube_project_x1.jpg", projectImage)
+for i in range(len(projectImageAndMapping)):
+    cv2.imwrite("output_cube_project_" + str(i) + ".jpg", projectImageAndMapping[i][0])
+    projectImage=projectImageAndMapping[i][0]
+    mapping=projectImageAndMapping[i][1]
+    projectImageGray = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
+    fld = cv2.ximgproc.createFastLineDetector()
+    lines = fld.detect(projectImageGray)
+    Visualization.DrawPanoLine(panoImage, lines, mapping, (255, 0, 0))
+    Visualization.DrawPanoLine(edges, lines, mapping, (255, 0, 0))
 
-projectImageGray = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
-fld = cv2.ximgproc.createFastLineDetector()
-lines = fld.detect(projectImageGray)
-
-Visualization.DrawPanoLine(panoImage, lines, mapping, (255, 0, 0))
-# Visualization.__drawPanoLineTest(panoImage, lines, mapping, (255, 0, 0))
-
-cv2.imwrite("output_pano_x1_lsd.jpg", panoImage)
-
-edges=np.zeros(panoImage.shape, dtype=np.uint8)
-Visualization.DrawPanoLine(edges, lines, mapping, (255, 0, 0))
-
-cv2.imwrite("output_pano_x1_edges.jpg", edges)
-
-
+cv2.imwrite("output_pano_lsd.jpg", panoImage)
+cv2.imwrite("output_pano_edges.jpg", edges)
