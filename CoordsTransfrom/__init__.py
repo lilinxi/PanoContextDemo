@@ -45,7 +45,7 @@ def xyz2uv(x, y, z):
 def uv2xyz(u, v):
     phi, theta = uv2phi_theta(u, v)
     x, y, z = phi_theta2xyz(phi, theta)
-    return x, z, y
+    return x, y, z
 
 
 def sphere2fakecube(x, y, z):

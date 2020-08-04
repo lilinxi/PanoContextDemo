@@ -279,6 +279,7 @@ def BuildCoords(normal):
         v1 = np.array([-normal[1], normal[0], 0])
     else:
         v1 = np.array([0, 1, 0])
+    v1 = v1 / np.linalg.norm(v1)
     v2 = np.cross(normal, v1)
     return v1, v2
     # if abs(normal[0]) > abs(normal[1]):  # x 必不为零
@@ -302,8 +303,8 @@ def RayProjection(panoImage, projectScale, u, v):
 
 def __demoRayProjection(panoImage, projectScale):
     ret = []
-    for u in np.linspace(0.2, 0.8, 7):
-        v = 0.5
+    for v in np.linspace(0.2, 0.8, 7):
+        u = 0.5
         projectImage, mapping = RayProjection(panoImage, projectScale, u, v)
         ret.append([projectImage, mapping])
     # u = 0.5
