@@ -16,7 +16,7 @@ for i in range(len(projectImageAndMapping)):
     projectImageGray = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
     fld = cv2.ximgproc.createFastLineDetector()
     lines = fld.detect(projectImageGray)
-    Visualization.DrawPanoLine(panoImage, lines, mapping, (255, 0, 0))
+    Visualization.DrawPanoLine(panoImage, lines, mapping, (0, 255, 0))
     Visualization.DrawPanoLine(edges, lines, mapping, (255, 0, 0))
 
 cv2.imwrite("output_pano_lsd_2.jpg", panoImage)

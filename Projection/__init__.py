@@ -17,6 +17,7 @@ def DemoProjection(panoImage, projectScale):
 def CubeProjection(panoImage, projectScale):
     """
     全景图转为六面体的投影图
+    六面体：x,y,z -> [-1,1], [-1,1], [-1,1]
     :param panoImage:       全景图（2X1 视角，彩色）cv2.imread('', cv2.IMREAD_COLOR)
     :param projectScale:    投影图大小
     :return:                投影图，投影图到全景图的映射（带scale的映射）
@@ -266,3 +267,48 @@ def __cubeProjectionZ_1(panoImage, projectScale):
         return mx, my
 
     return projectImage, mapping
+
+
+def BuildCoords(normal):
+    """
+    建立局部坐标系(右手坐标系)
+    :param normal:  已经正则化，作为坐标系的x轴
+    :return:        坐标系的y轴，z轴
+    """
+    if normal[1] != 0:
+        v1 = np.array([-normal[1], normal[0], 0])
+    else:
+        v1 = np.array([0, 1, 0])
+    v2 = np.cross(normal, v1)
+    return v1, v2
+    # if abs(normal[0]) > abs(normal[1]):  # x 必不为零
+    #     v1 = np.array([-normal[2], 0, normal[0]])
+    # else:  # x=y=0, z 必不为零；y>x, y 必不为零
+    #     v1 = np.array([0, normal[2], -normal[1]])
+    # v2 = np.cross(v1, normal)
+    # return v1, v2
+
+
+def RayProjection(panoImage, projectScale, u, v):
+    x, y, z = CoordsTransfrom.uv2xyz(u, v)
+    normal = np.array([x, y, z])
+    v1, v2 = BuildCoords(normal)
+    rotateMat = np.array([normal, v1, v2]).T  # 将 ray(x,y,z) 旋转到 (1,0,0) 的旋转矩阵
+    # for du in np.linspace(1, -1, projectScale):  # 列从上到下
+    # for dv in np.linspace(-1, 1, projectScale):  # 第一行
+    genRay = lambda u, v: rotateMat.dot(np.array([1, v, u]))
+    return __Projection(panoImage, projectScale, genRay)
+
+
+def __demoRayProjection(panoImage, projectScale):
+    ret = []
+    for u in np.linspace(0.2, 0.8, 7):
+        v = 0.5
+        projectImage, mapping = RayProjection(panoImage, projectScale, u, v)
+        ret.append([projectImage, mapping])
+    # u = 0.5
+    # v = 0.5
+    # projectImage, mapping = RayProjection(panoImage, projectScale, u, v)
+    # ret.append([projectImage, mapping])
+
+    return ret

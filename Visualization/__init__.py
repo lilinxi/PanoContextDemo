@@ -9,6 +9,14 @@ def __drawPanoLineTest(panoImage, lines, mapping, bgr, sampleRate=1.1):
 
 
 def DrawPanoLine(panoImage, lines, mapping, bgr, sampleRate=1.1):
+    """
+    在全景图中绘制投影直线
+    :param panoImage:       全景图
+    :param lines:           投影直线
+    :param mapping:         投影图到全景图的映射（带scale）
+    :param bgr:             颜色
+    :param sampleRate:      绘制直线的采样率
+    """
     for line in lines:
         x0 = line[0][0]
         y0 = line[0][1]

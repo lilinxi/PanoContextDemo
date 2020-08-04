@@ -2,6 +2,7 @@
 xyz:          [-1,1], [-1,1], [-1,1], 单位球面, 右手坐标系, z 轴向上
 u, v:         [0,1], [0,1], u 向下, v 向右
 phi, theta:   [0,pi], [0,2pi], phi 与 z 轴夹角, theta 与 x 轴夹角
+x, y:         [0,scaleW（shape[1]）], [0,scaleH（shape[0]）], 像素坐标，x->v，y->u
 """
 
 import math
@@ -68,6 +69,18 @@ def sphere2cube(x, y, z):
     maxValue = max(abs(x), abs(y), abs(z))
     scale = 1 / maxValue
     return [[x * scale, y * scale, z * scale]]
+
+
+def uv2xy(u, v, scaleShape):
+    x = round(v * scaleShape[1])
+    y = round(u * scaleShape[0])
+    return x, y
+
+
+def xy2uv(x, y, scaleShape):
+    u = y / scaleShape[0]
+    v = x / scaleShape[1]
+    return u, v
 
 
 ########## test ##########
