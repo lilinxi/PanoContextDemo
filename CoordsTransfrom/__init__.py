@@ -36,6 +36,7 @@ def uv2phi_theta(u, v):
     return phi, theta
 
 
+# 若u，v为1，scale后访问像素数组会越界；xyz2uv(0, 0, -1)->(1.0, 0.0)
 def xyz2uv(x, y, z):
     phi, theta = xyz2phi_theta(x, y, z)
     u, v = phi_theta2uv(phi, theta)
@@ -85,17 +86,23 @@ def xy2uv(x, y, scaleShape):
 
 ########## test ##########
 
-N = 1000
-epsilon = 0.0000000001
+if __name__ == "__main__":
 
-# phi 为 0 或 pi，theta 为 2pi 时无法等价转换
-for i in range(1, N):
-    for j in range(0, N):
-        phi = math.pi / N * i
-        theta = math.pi * 2 / N * j
-        x, y, z = phi_theta2xyz(phi, theta)
-        phiN, thetaN = xyz2phi_theta(x, y, z)
-        if math.fabs(phi - phiN) > epsilon:
-            print("error(phi):", phi, phiN)
-        if math.fabs(theta - thetaN) > epsilon:
-            print("error(theta):", theta, thetaN)
+    N = 1000
+    epsilon = 0.0000000001
+
+    # phi 为 0 或 pi，theta 为 2pi 时无法等价转换
+    for i in range(1, N):
+        for j in range(0, N):
+            phi = math.pi / N * i
+            theta = math.pi * 2 / N * j
+            x, y, z = phi_theta2xyz(phi, theta)
+            phiN, thetaN = xyz2phi_theta(x, y, z)
+            if math.fabs(phi - phiN) > epsilon:
+                print("error(phi):", phi, phiN)
+            if math.fabs(theta - thetaN) > epsilon:
+                print("error(theta):", theta, thetaN)
+
+    print(xyz2phi_theta(0, 0, 1))
+    print(xyz2phi_theta(0, 0, -1))
+    print(xyz2uv(0, 0, -1))

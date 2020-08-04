@@ -56,8 +56,10 @@ def __Projection(panoImage, projectScale, genRay):
             ray = genRay(du, dv)
             ray = ray / np.linalg.norm(ray)
             u, v = CoordsTransfrom.xyz2uv(ray[0], ray[1], ray[2])
-            panoU = round(u * panoImageShape[0])
-            panoV = round(v * panoImageShape[1])
+            panoU = int(u * panoImageShape[0])  # TODO 用 int 而不用 round，用 round 在 u，v 等于零和接近1的时候会丢失半个像素的信息
+            panoV = int(v * panoImageShape[1])
+            panoU = min(panoImageShape[0] - 1, panoU)
+            panoV = min(panoImageShape[1] - 1, panoV)
             rgb = panoImage[panoU][panoV]
             projectImage[projectU][projectV] = rgb
             projectV += 1
@@ -303,10 +305,11 @@ def RayProjection(panoImage, projectScale, u, v):
 
 def __demoRayProjection(panoImage, projectScale):
     ret = []
-    for v in np.linspace(0.2, 0.8, 7):
-        u = 0.5
-        projectImage, mapping = RayProjection(panoImage, projectScale, u, v)
-        ret.append([projectImage, mapping])
+    for v in np.linspace(0.3, 0.7, 5):
+        for u in np.linspace(0.3, 0.7, 5):
+            print(u, v)
+            projectImage, mapping = RayProjection(panoImage, projectScale, u, v)
+            ret.append([projectImage, mapping])
     # u = 0.5
     # v = 0.5
     # projectImage, mapping = RayProjection(panoImage, projectScale, u, v)

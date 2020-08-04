@@ -1,4 +1,3 @@
-import imageio as im
 import numpy as np
 import open3d
 import CoordsTransfrom
