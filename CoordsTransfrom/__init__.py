@@ -75,6 +75,9 @@ def sphere2cube(x, y, z):
 def uv2xy(u, v, scaleShape):
     x = round(v * scaleShape[1])
     y = round(u * scaleShape[0])
+    # 防止像素数组越界
+    x = min(x, scaleShape[1] - 1)
+    y = min(y, scaleShape[0] - 1)
     return x, y
 
 
@@ -82,6 +85,16 @@ def xy2uv(x, y, scaleShape):
     u = y / scaleShape[0]
     v = x / scaleShape[1]
     return u, v
+
+
+def xy2xyz(x, y, scaleShape):
+    u, v = xy2uv(x, y, scaleShape)
+    return uv2xyz(u, v)
+
+
+def xyz2xy(x, y, z, scaleShape):
+    u, v = xyz2uv(x, y, z)
+    return uv2xy(u, v, scaleShape)
 
 
 ########## test ##########
