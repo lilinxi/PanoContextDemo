@@ -5,6 +5,67 @@ import numpy as np
 import cv2
 import CoordsTransfrom
 import Projection
+import Visualization
+
+
+def HoughGreatCircleVpEstimationV2(panoImage, projectImageAndMappings, samples=360):
+    panoImageWithGreatCircleNormal = np.full((panoImage.shape[:2]), 2, dtype=np.uint8)  # 存储所有直线所在大圆的法线方向
+    panoImageEdges = np.zeros(panoImage.shape, dtype=np.uint8)  # 存储直线
+    for i in range(len(projectImageAndMappings)):
+        print(i)
+        projectImage = projectImageAndMappings[i][0]
+        mapping = projectImageAndMappings[i][1]
+        # TODO step1. 检测直线
+        grayImage = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
+        fld = cv2.ximgproc.createFastLineDetector()
+        lines = fld.detect(grayImage)
+        if lines is None:
+            continue
+        Visualization.DrawPanoLine(panoImageEdges, lines, mapping, (0, 255, 0), sampleRate=1.1)
+        for line in lines:
+            x0 = line[0][0]
+            y0 = line[0][1]
+            x1 = line[0][2]
+            y1 = line[0][3]
+            # TODO step2. 从投影 xy 坐标映射回全景图 xy 坐标
+            x0, y0 = mapping(x0, y0)
+            x1, y1 = mapping(x1, y1)
+            # TODO step3. 由线段两个端点和球心计算直线所在大圆的 normal
+            xa, ya, za = CoordsTransfrom.xy2xyz(x0, y0, panoImage.shape)
+            xb, yb, zb = CoordsTransfrom.xy2xyz(x1, y1, panoImage.shape)
+            a = np.array([xa, ya, za])
+            b = np.array([xb, yb, zb])
+            normal = np.cross(a, b)
+            # TODO step4. normal 垂直的大圆变换回 xy 并存储进 hough 图像
+            # TODO 可以 Hough 投票检测到 4 个消失点
+            v1, v2 = Projection.BuildCoords(normal)
+            for theta in np.linspace(0, 2 * np.pi, samples, endpoint=False):
+                p = np.cos(theta) * v1 + np.sin(theta) * v2
+
+                # TODO step5. 抑制线上的投票点，p 与 a,b 叉乘，同向的点保留，不同向的点为线上点，或线上点的对称点，不予保留，都与 normal 方向相同或者相反即为同向
+                pa = np.cross(p, a)
+                pb = np.cross(p, b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                pa = np.cross(p, -a)
+                pb = np.cross(p, -b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                xp, yp = CoordsTransfrom.xyz2xy(p[0], p[1], p[2], panoImage.shape)
+                panoImageWithGreatCircleNormal[yp][xp] *= 4
+
+    # vps = np.where(panoImageWithGreatCircleNormal == max(panoImageWithGreatCircleNormal.flat))
+    # for i in range(len(vps[0])):
+    #     x = vps[1][i]
+    #     y = vps[0][i]
+    #     cv2.circle(panoImageWithGreatCircleNormal, (x, y), 10, 255, -1)
+
+    return  panoImageEdges,panoImageWithGreatCircleNormal
+    # cv2.imwrite("output_hough_great_circle_normal_p.jpg", panoImageWithGreatCircleNormal)
 
 
 def HoughGreatCircleVpEstimation(panoImage, projectImageAndMappings, samples=360):
@@ -17,6 +78,8 @@ def HoughGreatCircleVpEstimation(panoImage, projectImageAndMappings, samples=360
         grayImage = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
         fld = cv2.ximgproc.createFastLineDetector()
         lines = fld.detect(grayImage)
+        if lines is None:
+            continue
         for line in lines:
             x0 = line[0][0]
             y0 = line[0][1]
@@ -35,10 +98,10 @@ def HoughGreatCircleVpEstimation(panoImage, projectImageAndMappings, samples=360
             # TODO 可以由大圆检测到 6 个消失点
             # xn, yn = CoordsTransfrom.xyz2xy(normal[0], normal[1], normal[2], panoImage.shape)
             # x_n, y_n = CoordsTransfrom.xyz2xy(-normal[0], -normal[1], -normal[2], panoImage.shape)
-            # cv2.circle(panoImageWithGreatCircleNormal, (xn, yn), 10, (0, 255, 0), -1)
-            # cv2.circle(panoImageWithGreatCircleNormal, (x_n, y_n), 10, (0, 255, 0), -1)
+            # cv2.circle(panoImageWithGreatCircleNormal, (xn, yn), 10, 255, -1)
+            # cv2.circle(panoImageWithGreatCircleNormal, (x_n, y_n), 10, 255, -1)
             # TODO step4. normal 垂直的大圆变换回 xy 并存储进 hough 图像
-            # TODO 可以 Hough 投票检测到 6 个消失点
+            # TODO 可以 Hough 投票检测到 4 个消失点
             v1, v2 = Projection.BuildCoords(normal)
             for theta in np.linspace(0, 2 * np.pi, samples, endpoint=False):
                 p = np.cos(theta) * v1 + np.sin(theta) * v2
@@ -51,7 +114,8 @@ def HoughGreatCircleVpEstimation(panoImage, projectImageAndMappings, samples=360
     #     y = vps[0][i]
     #     cv2.circle(panoImageWithGreatCircleNormal, (x, y), 10, 255, -1)
 
-    cv2.imwrite("output_hough_great_circle_normal_p.jpg", panoImageWithGreatCircleNormal)
+    return panoImageWithGreatCircleNormal
+    # cv2.imwrite("output_hough_great_circle_normal_p.jpg", panoImageWithGreatCircleNormal)
 
 
 def HoughVpEstimation(projectImage, scaleT=(-15, 16), sampleRate=1.1):

@@ -11,3 +11,5 @@ projectScale = 500
 projectImageAndMappings = Projection.CubeProjection(panoImage, projectScale)
 
 VpEstimation.HoughGreatCircleVpEstimation(panoImage, projectImageAndMappings)
+
+# cv2.imwrite("output_hough_great_circle_normal_p.jpg", panoImageWithGreatCircleNormal)
