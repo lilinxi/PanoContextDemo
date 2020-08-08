@@ -187,6 +187,7 @@ def HoughGreatCircleVpEstimationSegmentationAndLineIndex(panoImage, logid="0"):
         x, y = CoordsTransfrom.xyz2xy(vp[0], vp[1], vp[2], panoImage.shape)
         cv2.circle(panoImage, (x, y), 20, (0, 0, 0), -1)
 
+    minLineSquare = 900  # projectScale/20 **2 : 600/20**2
     for i in range(len(projectImageAndMappings)):
         projectImage = projectImageAndMappings[i][0]
         mapping = projectImageAndMappings[i][1]
@@ -201,8 +202,8 @@ def HoughGreatCircleVpEstimationSegmentationAndLineIndex(panoImage, logid="0"):
             x1 = line[0][2]
             y1 = line[0][3]
             # TODO 筛选出足够长的线段
-            # if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
-            #     continue
+            if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
+                continue
             lineIndex = GetLineIndex(line, mapping, panoImage.shape, orthogonalVps)
             # print(lineIndex)
             if lineIndex == 0:
