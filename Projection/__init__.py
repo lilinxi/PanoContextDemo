@@ -9,6 +9,8 @@ def DemoProjection(panoImage, projectScale):
     def mapping(x, y):
         return x, y
 
+    # TODO no scale mapping
+
     return [
         [projectImage, mapping]
     ]
@@ -322,3 +324,20 @@ def __demoRayProjection(panoImage, projectScale):
     # ret.append([projectImage, mapping])
 
     return ret
+
+
+def ARoundProjection(panoImage, projectScale):
+    x1, mappingX1 = __Projection(panoImage, projectScale, lambda u, v: np.array([1, v, u]))
+    print("x1")
+    x_1, mappingX_1 = __Projection(panoImage, projectScale, lambda u, v: np.array([-1, v, u]))
+    print("x_1")
+    y1, mappingY1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, 1, u]))
+    print("y1")
+    y_1, mappingY_1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, -1, u]))
+    print("y_1")
+    return [
+        [x1, mappingX1],
+        [x_1, mappingX_1],
+        [y1, mappingY1],
+        [y_1, mappingY_1],
+    ]

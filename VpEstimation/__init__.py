@@ -6,6 +6,345 @@ import cv2
 import CoordsTransfrom
 import Projection
 import Visualization
+import Segmentation
+
+
+def GetOrthogonalVps(vps):
+    """
+    找到两个方向的灭点，计算第三个方向的灭点
+    """
+    if len(vps) < 2:
+        print("vps not enough")
+        exit(-1)
+    # find orthogonalVpX
+    vpXErrs = []
+    for i in range(len(vps)):
+        errSum = 0
+        for j in range(len(vps)):
+            err = np.dot(vps[i], vps[j])
+            err = min(abs(err), 1 - abs(err))
+            errSum += err
+        vpXErrs.append(errSum)
+    vpXIndex = vpXErrs.index(min(vpXErrs))
+    orthogonalVpX = vps[vpXIndex]
+    print("X", orthogonalVpX)
+    # find orthogonalVpY
+    vpYErrs = []
+    for i in range(len(vps)):
+        err = np.dot(vps[i], orthogonalVpX)
+        vpYErrs.append(abs(err))
+    vpYIndex = vpYErrs.index(min(vpYErrs))
+    orthogonalVpY = vps[vpYIndex]
+    print("Y", orthogonalVpY)
+    # compute orthogonalVpZ
+    orthogonalVpZ = np.cross(orthogonalVpX, orthogonalVpY)
+    print("Z", orthogonalVpZ)
+    return [
+        orthogonalVpX,
+        orthogonalVpY,
+        orthogonalVpZ,
+    ]
+
+
+def GetLineIndex(line, mapping, panoImageShape, orthogonalVps):
+    x0 = line[0][0]
+    y0 = line[0][1]
+    x1 = line[0][2]
+    y1 = line[0][3]
+    x0, y0 = mapping(x0, y0)
+    x1, y1 = mapping(x1, y1)
+    xa, ya, za = CoordsTransfrom.xy2xyz(x0, y0, panoImageShape)
+    xb, yb, zb = CoordsTransfrom.xy2xyz(x1, y1, panoImageShape)
+    a = np.array([xa, ya, za])
+    b = np.array([xb, yb, zb])
+    normal = np.cross(a, b)
+
+    errs = []
+    errs.append(abs(np.dot(normal, orthogonalVps[0])))
+    errs.append(abs(np.dot(normal, orthogonalVps[1])))
+    errs.append(abs(np.dot(normal, orthogonalVps[2])))
+    # TODO 去除都不符合的
+    # TODO 不能用法线方向判断，有误差，用灭点是否在大圆上判断，灭点也不能在直线上
+
+    errSort = np.sort(errs)
+    if errSort[1] > 0.01:
+        lineIndex = errs.index(min(errs))
+    else:
+        lineIndex = -1  # 无法判断
+    print(errs, lineIndex)
+    return lineIndex
+
+
+def HoughGreatCircleVpEstimationSegmentationAndLineIndex(panoImage, logid="0"):
+    panoImage = cv2.resize(panoImage, (2000, 1000), interpolation=cv2.INTER_AREA)
+    projectScale = 600
+    # projectScale = round(panoImage.shape[0] * 2 / np.pi)  # pano -> project 倍数 pi/2
+    minLineSquare = 1600  # projectScale/15 **2
+
+    segmentationShape = (300, 600)
+    phi_theta2segmentation, segmentation2phi_theta = Segmentation.SolidAngleSegmentation(segmentationShape)
+    circleSamples = 600
+
+    projectImageAndMappings = Projection.ARoundProjection(panoImage, projectScale)
+
+    panoImageVpsAll = np.zeros(segmentationShape)
+    # panoImageVpsAll = np.full(segmentationShape, 2)
+
+    goodLines = []
+    goodLinesMapping = []
+    for i in range(len(projectImageAndMappings)):
+        print(i)
+        projectImage = projectImageAndMappings[i][0]
+        mapping = projectImageAndMappings[i][1]
+        # TODO step1. 检测直线
+        grayImage = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
+        fld = cv2.ximgproc.createFastLineDetector()
+        lines = fld.detect(grayImage)
+        if lines is None:
+            continue
+        for line in lines:
+            x0 = line[0][0]
+            y0 = line[0][1]
+            x1 = line[0][2]
+            y1 = line[0][3]
+            # TODO 筛选出足够长的线段
+            if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
+                continue
+            dx = x1 - x0
+            if abs(dx) < 0.1:
+                continue
+            dy = y1 - y0
+            if abs(dy / dx) > 10:
+                continue
+            goodLines.append(line)  # TODO 筛选好的线段
+            goodLinesMapping.append(mapping)
+            # TODO step2. 从投影 xy 坐标映射回全景图 xy 坐标
+            x0, y0 = mapping(x0, y0)
+            x1, y1 = mapping(x1, y1)
+            # TODO step3. 由线段两个端点和球心计算直线所在大圆的 normal
+            xa, ya, za = CoordsTransfrom.xy2xyz(x0, y0, panoImage.shape)
+            xb, yb, zb = CoordsTransfrom.xy2xyz(x1, y1, panoImage.shape)
+            a = np.array([xa, ya, za])
+            b = np.array([xb, yb, zb])
+            normal = np.cross(a, b)
+            # TODO step4. normal 垂直的大圆变换回 xy 并存储进 hough 图像
+            # TODO 可以 Hough 投票检测到 4 个消失点
+            v1, v2 = Projection.BuildCoords(normal)
+            panoImageVpsSelect = np.zeros(segmentationShape)
+            for theta in np.linspace(0, 2 * np.pi, circleSamples, endpoint=False):
+                p = np.cos(theta) * v1 + np.sin(theta) * v2
+
+                # TODO step5. 抑制线上的投票点，p 与 a,b 叉乘，同向的点保留，不同向的点为线上点，或线上点的对称点，不予保留，都与 normal 方向相同或者相反即为同向
+                pa = np.cross(p, a)
+                pb = np.cross(p, b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                pa = np.cross(p, -a)
+                pb = np.cross(p, -b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                phi, theta = CoordsTransfrom.xyz2phi_theta(p[0], p[1], p[2])
+                segmentationI, segmentationJ = phi_theta2segmentation(phi, theta)
+                panoImageVpsSelect[segmentationI][segmentationJ] = 1
+
+            panoImageVpsAll = panoImageVpsAll + panoImageVpsSelect
+
+    splitSize = 10
+    step = round(segmentationShape[1] / splitSize)
+    splitMax = []
+    for i in range(splitSize):
+        splitMax.append(max(panoImageVpsAll[:, i * step:(i + 1) * step].flat))
+
+    splitMax = np.sort(splitMax)
+    splitMax[8] = splitMax[0]
+    splitMax[9] = splitMax[0]
+    splitMaxAvg = np.sum(splitMax) / 10
+    for i in range(splitSize):
+        maxValue = max(panoImageVpsAll[:, i * step:(i + 1) * step].flat)
+        if maxValue > splitMaxAvg:
+            panoImageVpsAll[:, i * step:(i + 1) * step] = panoImageVpsAll[:, i * step:(i + 1) * step] / maxValue
+        else:
+            panoImageVpsAll[:, i * step:(i + 1) * step] = panoImageVpsAll[:, i * step:(i + 1) * step] / splitMaxAvg
+
+    vps = np.where((0.99 < panoImageVpsAll))
+    sphereVps = []
+    for i in range(len(vps[0])):
+        segmentationI = vps[0][i]
+        segmentationJ = vps[1][i]
+        phi, theta = segmentation2phi_theta(segmentationI, segmentationJ)
+        x, y, z = CoordsTransfrom.phi_theta2xyz(phi, theta)
+        sphereVps.append(np.array([x, y, z]))
+
+    orthogonalVps = GetOrthogonalVps(sphereVps)
+
+    print(orthogonalVps)
+
+    for vp in orthogonalVps:
+        x, y = CoordsTransfrom.xyz2xy(vp[0], vp[1], vp[2], panoImage.shape)
+        cv2.circle(panoImage, (x, y), 20, (0, 0, 0), -1)
+
+    for i in range(len(projectImageAndMappings)):
+        projectImage = projectImageAndMappings[i][0]
+        mapping = projectImageAndMappings[i][1]
+        grayImage = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
+        fld = cv2.ximgproc.createFastLineDetector()
+        lines = fld.detect(grayImage)
+        if lines is None:
+            continue
+        for line in lines:
+            x0 = line[0][0]
+            y0 = line[0][1]
+            x1 = line[0][2]
+            y1 = line[0][3]
+            # TODO 筛选出足够长的线段
+            # if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
+            #     continue
+            lineIndex = GetLineIndex(line, mapping, panoImage.shape, orthogonalVps)
+            # print(lineIndex)
+            if lineIndex == 0:
+                Visualization.DrawPanoLine(panoImage, [line], mapping, (0, 255, 0), sampleRate=1.1)
+            elif lineIndex == 1:
+                Visualization.DrawPanoLine(panoImage, [line], mapping, (255, 0, 0), sampleRate=1.1)
+            elif lineIndex == 2:
+                Visualization.DrawPanoLine(panoImage, [line], mapping, (0, 0, 255), sampleRate=1.1)
+
+    cv2.imwrite("output_" + logid + ".jpg", panoImage)
+
+
+def HoughGreatCircleVpEstimationSegmentation(panoImage, logid="0"):
+    panoImage = cv2.resize(panoImage, (2000, 1000), interpolation=cv2.INTER_AREA)
+    projectScale = 600
+    # projectScale = round(panoImage.shape[0] * 2 / np.pi)  # pano -> project 倍数 pi/2
+    minLineSquare = 1600  # projectScale/15 **2
+
+    segmentationShape = (300, 600)
+    phi_theta2segmentation, segmentation2phi_theta = Segmentation.SolidAngleSegmentation(segmentationShape)
+    circleSamples = 600
+
+    projectImageAndMappings = Projection.ARoundProjection(panoImage, projectScale)
+
+    panoImageVpsAll = np.zeros(segmentationShape)
+    # panoImageVpsAll = np.full(segmentationShape, 2)
+
+    for i in range(len(projectImageAndMappings)):
+        print(i)
+        projectImage = projectImageAndMappings[i][0]
+        mapping = projectImageAndMappings[i][1]
+        # TODO step1. 检测直线
+        grayImage = cv2.cvtColor(projectImage, cv2.COLOR_BGR2GRAY)
+        fld = cv2.ximgproc.createFastLineDetector()
+        lines = fld.detect(grayImage)
+        if lines is None:
+            continue
+        goodLines = []
+        for line in lines:
+            x0 = line[0][0]
+            y0 = line[0][1]
+            x1 = line[0][2]
+            y1 = line[0][3]
+            # TODO 筛选出足够长的线段
+            if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
+                continue
+            dx = x1 - x0
+            if abs(dx) < 0.1:
+                continue
+            dy = y1 - y0
+            if abs(dy / dx) > 10:
+                continue
+            goodLines.append(line)
+            # TODO step2. 从投影 xy 坐标映射回全景图 xy 坐标
+            x0, y0 = mapping(x0, y0)
+            x1, y1 = mapping(x1, y1)
+            # TODO step3. 由线段两个端点和球心计算直线所在大圆的 normal
+            xa, ya, za = CoordsTransfrom.xy2xyz(x0, y0, panoImage.shape)
+            xb, yb, zb = CoordsTransfrom.xy2xyz(x1, y1, panoImage.shape)
+            a = np.array([xa, ya, za])
+            b = np.array([xb, yb, zb])
+            normal = np.cross(a, b)
+            # TODO step4. normal 垂直的大圆变换回 xy 并存储进 hough 图像
+            # TODO 可以 Hough 投票检测到 4 个消失点
+            v1, v2 = Projection.BuildCoords(normal)
+            panoImageVpsSelect = np.zeros(segmentationShape)
+            for theta in np.linspace(0, 2 * np.pi, circleSamples, endpoint=False):
+                p = np.cos(theta) * v1 + np.sin(theta) * v2
+
+                # TODO step5. 抑制线上的投票点，p 与 a,b 叉乘，同向的点保留，不同向的点为线上点，或线上点的对称点，不予保留，都与 normal 方向相同或者相反即为同向
+                pa = np.cross(p, a)
+                pb = np.cross(p, b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                pa = np.cross(p, -a)
+                pb = np.cross(p, -b)
+
+                if np.dot(pa, normal) * np.dot(pb, normal) < 0:
+                    continue
+
+                phi, theta = CoordsTransfrom.xyz2phi_theta(p[0], p[1], p[2])
+                segmentationI, segmentationJ = phi_theta2segmentation(phi, theta)
+                # if panoImageVpsSelect[segmentationI][segmentationJ] == 0:
+                #     panoImageVpsAll[segmentationI][segmentationJ] *= 2
+                panoImageVpsSelect[segmentationI][segmentationJ] = 1
+
+            panoImageVpsAll = panoImageVpsAll + panoImageVpsSelect
+        Visualization.DrawPanoLine(panoImage, goodLines, mapping, (0, 255, 0), sampleRate=1.1)
+
+    # panoImageVpsAll = panoImageVpsAll / max(panoImageVpsAll.flat)
+    splitSize = 10
+    step = round(segmentationShape[1] / splitSize)
+    splitMax = []
+    for i in range(splitSize):
+        splitMax.append(max(panoImageVpsAll[:, i * step:(i + 1) * step].flat))
+
+    print(splitMax)
+    splitMax = np.sort(splitMax)
+    # 一般会有1~2个很好的消失点，将他们去除掉进行投票统计
+    splitMax[8] = splitMax[0]
+    splitMax[9] = splitMax[0]
+    splitMaxAvg = np.sum(splitMax) / 10
+    print(splitMaxAvg)
+    for i in range(splitSize):
+        maxValue = max(panoImageVpsAll[:, i * step:(i + 1) * step].flat)
+        if maxValue > splitMaxAvg:
+            print("max")
+            panoImageVpsAll[:, i * step:(i + 1) * step] = panoImageVpsAll[:, i * step:(i + 1) * step] / maxValue
+        else:
+            panoImageVpsAll[:, i * step:(i + 1) * step] = panoImageVpsAll[:, i * step:(i + 1) * step] / splitMaxAvg
+
+    # vps = np.where((0.7 < panoImageVpsAll) & (panoImageVpsAll <= 0.8))
+    # for i in range(len(vps[0])):
+    #     segmentationI = vps[0][i]
+    #     segmentationJ = vps[1][i]
+    #     phi, theta = segmentation2phi_theta(segmentationI, segmentationJ)
+    #     x, y = CoordsTransfrom.phi_theta2xy(phi, theta, panoImage.shape)
+    #     cv2.circle(panoImage, (x, y), 10, (0, 255, 0), -1)
+    #
+    # vps = np.where((0.8 < panoImageVpsAll) & (panoImageVpsAll <= 0.9))
+    # for i in range(len(vps[0])):
+    #     segmentationI = vps[0][i]
+    #     segmentationJ = vps[1][i]
+    #     phi, theta = segmentation2phi_theta(segmentationI, segmentationJ)
+    #     x, y = CoordsTransfrom.phi_theta2xy(phi, theta, panoImage.shape)
+    #     cv2.circle(panoImage, (x, y), 10, (255, 0, 0), -1)
+
+    vps = np.where((0.99 < panoImageVpsAll))
+    print("vps:", len(vps[0]))
+    for i in range(len(vps[0])):
+        segmentationI = vps[0][i]
+        segmentationJ = vps[1][i]
+        phi, theta = segmentation2phi_theta(segmentationI, segmentationJ)
+        x, y = CoordsTransfrom.phi_theta2xy(phi, theta, panoImage.shape)
+        cv2.circle(panoImage, (x, y), 10, (0, 0, 255), -1)
+
+    cv2.imwrite("output_" + logid + "_test_segmentation_panoImageLines.jpg", panoImage)
+    panoImageVpsAll = panoImageVpsAll * 255
+    panoImageVpsAll.astype(np.uint8)
+    cv2.imwrite("output_" + logid + "_test_segmentation_panoImageVpsAll.jpg", panoImageVpsAll)
 
 
 def HoughGreatCircleVpEstimationTest(panoImage, samples=360, logid=0):

@@ -97,6 +97,18 @@ def xyz2xy(x, y, z, scaleShape):
     return uv2xy(u, v, scaleShape)
 
 
+def xy2phi_theta(x, y, scaleShape):
+    u, v = xy2uv(x, y, scaleShape)
+    phi, theta = uv2phi_theta(u, v)
+    return phi, theta
+
+
+def phi_theta2xy(phi, theta, scaleShape):
+    u, v = phi_theta2uv(phi, theta)
+    x, y = uv2xy(u, v, scaleShape)
+    return x, y
+
+
 ########## test ##########
 
 if __name__ == "__main__":
