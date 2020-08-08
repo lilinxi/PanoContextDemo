@@ -30,11 +30,17 @@ def CubeProjection(panoImage, projectScale):
     # z_1, mappingZ_1 = __cubeProjectionZ_1(panoImage, projectScale)
 
     x1, mappingX1 = __Projection(panoImage, projectScale, lambda u, v: np.array([1, v, u]))
+    print("x1")
     x_1, mappingX_1 = __Projection(panoImage, projectScale, lambda u, v: np.array([-1, v, u]))
+    print("x_1")
     y1, mappingY1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, 1, u]))
+    print("y1")
     y_1, mappingY_1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, -1, u]))
+    print("y_1")
     z1, mappingZ1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, u, 1]))
+    print("z1")
     z_1, mappingZ_1 = __Projection(panoImage, projectScale, lambda u, v: np.array([v, u, -1]))
+    print("z_1")
     return [
         [x1, mappingX1],
         [x_1, mappingX_1],

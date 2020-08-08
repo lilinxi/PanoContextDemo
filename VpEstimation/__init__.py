@@ -9,8 +9,10 @@ import Visualization
 
 
 def HoughGreatCircleVpEstimationTest(panoImage, samples=360, logid=0):
-    projectScale = round(panoImage.shape[0] * 2 / np.pi)  # pano -> project 倍数 pi/2
-    minLineSquare = projectScale * projectScale / 100  # projectScale/10 **2
+    panoImage = cv2.resize(panoImage, (2000, 1000), interpolation=cv2.INTER_AREA)
+    projectScale = 500
+    # projectScale = round(panoImage.shape[0] * 2 / np.pi)  # pano -> project 倍数 pi/2
+    minLineSquare = 625  # projectScale/10 **2
 
     projectImageAndMappings = Projection.CubeProjection(panoImage, projectScale)
 
@@ -29,14 +31,16 @@ def HoughGreatCircleVpEstimationTest(panoImage, samples=360, logid=0):
         lines = fld.detect(grayImage)
         if lines is None:
             continue
-        Visualization.DrawPanoLine(panoImageLines, lines, mapping, (0, 255, 0), sampleRate=1.1)
+        goodLines = []
         for line in lines:
             x0 = line[0][0]
             y0 = line[0][1]
             x1 = line[0][2]
             y1 = line[0][3]
+            # TODO 筛选出足够长的线段
             if (x1 - x0) ** 2 + (y1 - y0) ** 2 < minLineSquare:
                 continue
+            goodLines.append(line)
             # TODO step2. 从投影 xy 坐标映射回全景图 xy 坐标
             x0, y0 = mapping(x0, y0)
             x1, y1 = mapping(x1, y1)
@@ -52,29 +56,33 @@ def HoughGreatCircleVpEstimationTest(panoImage, samples=360, logid=0):
             for theta in np.linspace(0, 2 * np.pi, samples, endpoint=False):
                 p = np.cos(theta) * v1 + np.sin(theta) * v2
                 xp, yp = CoordsTransfrom.xyz2xy(p[0], p[1], p[2], panoImage.shape)
-                panoImageVpsAll[yp][xp] = 255
+                panoImageVpsAll[yp][xp] *= 4
 
                 # TODO step5. 抑制线上的投票点，p 与 a,b 叉乘，同向的点保留，不同向的点为线上点，或线上点的对称点，不予保留，都与 normal 方向相同或者相反即为同向
                 pa = np.cross(p, a)
                 pb = np.cross(p, b)
 
                 if np.dot(pa, normal) * np.dot(pb, normal) < 0:
-                    panoImageVpsBad[yp][xp] = 255
+                    panoImageVpsBad[yp][xp] *= 4
                     continue
 
                 pa = np.cross(p, -a)
                 pb = np.cross(p, -b)
 
                 if np.dot(pa, normal) * np.dot(pb, normal) < 0:
-                    panoImageVpsBad[yp][xp] = 255
+                    panoImageVpsBad[yp][xp] *= 4
                     continue
 
-                panoImageVpsGood[yp][xp] = 255
+                panoImageVpsGood[yp][xp] *= 4
+
+        Visualization.DrawPanoLine(panoImageLines, goodLines, mapping, (0, 255, 0), sampleRate=1.1)
 
     cv2.imwrite("output_test_panoImageLines_" + str(logid) + ".jpg", panoImageLines)
     cv2.imwrite("output_test_panoImageVpsAll_" + str(logid) + ".jpg", panoImageVpsAll)
     cv2.imwrite("output_test_panoImageVpsGood_" + str(logid) + ".jpg", panoImageVpsGood)
     cv2.imwrite("output_test_panoImageVpsBad_" + str(logid) + ".jpg", panoImageVpsBad)
+    panoImageVpsGood_median = cv2.medianBlur(panoImageVpsGood, 5)
+    cv2.imwrite("output_test_panoImageVpsGood_median_5_" + str(logid) + ".jpg", panoImageVpsGood_median)
 
 
 def HoughGreatCircleVpEstimationV2(panoImage, projectImageAndMappings, samples=360):

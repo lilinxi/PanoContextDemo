@@ -3,7 +3,8 @@ import numpy as np
 import open3d
 import CoordsTransfrom
 
-img = im.imread('./images/360.jpg')
+# img = im.imread('./images/360.jpg')
+img = im.imread('../dataset-good/dataset-26.jpg')
 img = np.array(img)
 print(img.shape)
 
