@@ -2,7 +2,7 @@ import taichi as ti
 import numpy as np
 import cv2
 
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.cpu)
 
 PanoImageShape = (1000, 2000)
 PanoImage = ti.Vector.field(3, dtype=ti.uint8, shape=PanoImageShape)
@@ -10,7 +10,7 @@ PanoImage = ti.Vector.field(3, dtype=ti.uint8, shape=PanoImageShape)
 
 def ReadImage(filename):
     panoImage = cv2.imread(filename, cv2.IMREAD_COLOR)
-    panoImage = cv2.resize(panoImage, PanoImageShape, interpolation=cv2.INTER_AREA)
+    panoImage = cv2.resize(panoImage, (2000, 1000), interpolation=cv2.INTER_AREA)
     PanoImage.from_numpy(panoImage)
 
 
@@ -95,6 +95,12 @@ def test_taichi():
         PanoImage[x, y][1] = 0
 
 
+def test_taichi_p():
+    for x in range(1000):
+        for y in range(2000):
+            PanoImage[x, y][1] = 0
+
+
 @ti.func
 def GenRay(a: ti.Vector):
     return ti.Vector([1, a[0], a[1]])
@@ -104,8 +110,8 @@ def GenRay(a: ti.Vector):
 def ProjectionTaichi():
     a = ti.Vector([2, 3])
     print(a)
-    GenRay = lambda a: ti.Vector([1, a[0], a[1]])
-    print(GenRay(a))
+    # GenRay = lambda a: ti.Vector([1, a[0], a[1]])
+    # print(GenRay(a))
     pass
 
 
@@ -115,9 +121,24 @@ def t():
     WriteImage("test.jpg")
 
 
+@ti.kernel
+def TestP():
+    print("be")
+    for i in range(100):
+        print(i)
+
+
+@ti.kernel
+def inside_taichi_scope():
+    x = 233
+    print('hello', x)
+
+
 if __name__ == "__main__":
+    # TestP()
+    # inside_taichi_scope()
     # t()
-    ProjectionTaichi()
-    # ReadImage("../images/360_1.jpg")
-    # test_taichi()
-    # WriteImage("test.jpg")
+    # ProjectionTaichi()
+    ReadImage("../images/360_1.jpg")
+    test_taichi()
+    WriteImage("./output_test_p.jpg")
